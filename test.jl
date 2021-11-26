@@ -2,57 +2,140 @@ include("analise.jl")
 
 using Test
 using .Analise
+using SparseArrays
 
 # =======================================================================
-@testset "No" begin
-    @testset "No_trelica" begin
-        no₁ = No(1, -1.5, -2)
-        no₂ = No(2, 3, 3, fx=1, fy=-1, fxy=1, rx=true, ry=true, rxy=true)
+@testset verbose = true "Analise" begin
 
-        # Fields
-        @test no₁.id == 1
-        @test no₁.x == -1.5
-        @test no₁.y == -2
-        @test no₁.fx == no₁.fy == 0
-        @test no₁.fxy ≡ no₁.rxy ≡ nothing
-        @test no₁.rx == no₁.ry == false
-        # Erros
-        # id
-        @test_throws ArgumentError No(-1, 1, 1)
-        # Compatibilidade entre fxy e rxy
-        @test_throws ArgumentError No(1, 1, 1, fxy=2)
-        @test_throws ArgumentError No(1, 1, 1, rxy=true)
+    # Nós
+    nos = [No(1, 1, -1; rx=true, ry=true),
+           No(2, 3, -1),
+           No(3, 5, -1),
+           No(4, 7, -1; rx=true, ry=true),
+           No(5, 3, 1; fx=10, fy=-5),
+           No(6, 5, 1)]
+    
+    # Material
+    material = Material(1, 100e6)
+    
+    # Elementos
+    area = 0.0014
+    elementos = [Elemento(1, nos[1], nos[2], area, material),
+                 Elemento(2, nos[1], nos[5], area, material),
+                 Elemento(3, nos[2], nos[3], area, material),
+                 Elemento(4, nos[2], nos[6], area, material),
+                 Elemento(5, nos[4], nos[3], area, material),
+                 Elemento(6, nos[5], nos[2], area, material),
+                 Elemento(7, nos[6], nos[3], area, material),
+                 Elemento(8, nos[6], nos[4], area, material),
+                 Elemento(9, nos[6], nos[5], area, material)]
+    
+    # Estrutura
+    estrutura = Estrutura(nos, elementos)
 
-        # Funções
-        @test Analise.num_gls(no₁) == 2
-        @test Analise.num_gls(no₂) == 3
+    @testset "No" begin
+        @test nos[2].id == 2
+        @test nos[2].x == 3
+        @test nos[2].y == -1
+        @test nos[2].fx == 0
+        @test nos[2].fy == 0
+        @test nos[2].rx == false
+        @test nos[2].ry == false
 
-        @test Analise.distancia(no₁, no₂) ≈ 6.726812023536855
+        @test_throws ArgumentError No(0, 3, -1)
 
+        # Métodos
+        @test Analise.distancia(nos[1], nos[5]) ≈ 2.8284271247461903
+        
+        @test Analise.gls_no(nos[3]) == [5, 6]
+        
+        @test Analise.vetor_forcas(nos[1]) == [0, 0]
+        @test Analise.vetor_forcas(nos[5]) == [10, -5]
+
+        @test Analise.vetor_apoios(nos[1]) == [true, true]
+        @test Analise.vetor_apoios(nos[2]) == [false, false]
     end
-end
 
-# =======================================================================
-@testset "Material" begin
-    # Fields
-    m = Material(1, 5e9)
-    #id
-    @test m.id == 1
-    @test m.E == 5e9
+    @testset "Material" begin
+        @test material.id == 1
+        @test material.E == 100e6
 
-    # id
-    @test_throws ArgumentError Material(0, 1e9)
-    # E
-    @test_throws ArgumentError Material(1, -1)
+        @test_throws ArgumentError Material(-1, 100e6)
+        @test_throws ArgumentError Material(1, -100e6)
+    end
 
-    # Métodos
-end
+    @testset "Elementos" begin
+        @test elementos[2].id == 2
+        @test elementos[2].no₁ == nos[1]
+        @test elementos[2].no₂ == nos[5]
+        @test elementos[2].area ≈ area
+        @test elementos[2].material == material
 
-# =======================================================================
-@testset "Estrutura" begin
-    # Unidades: kN, cm
-    material = Material(1, 2e5)
-    area = 13.796
-    inercia = 8.1052e2
+        # Métodos
+        @test Analise.comprimento(elementos[2]) ≈ 2.8284271247461903
+        
+        @test Analise.gls_elem(elementos[2]) == [1, 2, 9, 10]
+
+        @test Analise.vetor_forcas(elementos[2]) == [0, 0, 10, -5]
+        @test Analise.vetor_forcas(elementos[9]) == [0, 0, 10, -5]
+        @test Analise.vetor_forcas(elementos[3]) == [0, 0, 0, 0]
+        
+        @test Analise.angulo(elementos[4]) ≈ pi / 4
+        @test Analise.angulo(elementos[9]) ≈ 0
+        @test Analise.angulo(elementos[8]) ≈ -pi / 4
+
+        @test Analise.mat_rot(elementos[3]) ≈ [1 0 0 0 
+                                               0 1 0 0
+                                               0 0 1 0
+                                               0 0 0 1]
+        @test Analise.mat_rot(elementos[4]) ≈ [√2/2 √2/2  0       0
+                                              -√2/2 √2/2  0       0
+                                               0       0  √2/2 √2/2
+                                               0       0 -√2/2 √2/2]
+
+        @test Analise.ke(elementos[4]) ≈ [49497.474683058324  0 -49497.474683058324   0
+                                                           0  0                   0   0
+                                         -49497.474683058324  0  49497.474683058324   0
+                                                           0  0                   0   0]
+
+        @test Analise.ke_rot(elementos[4]) ≈ [24748.737341529166 24748.737341529162 -24748.737341529166 -24748.737341529162
+                                              24748.73734152916 24748.737341529155 -24748.73734152916 -24748.737341529155
+                                             -24748.737341529166 -24748.737341529162 24748.737341529166 24748.737341529162 
+                                             -24748.73734152916 -24748.737341529155 24748.73734152916 24748.737341529155]
+    end
+
+    @testset "Estrutura" begin
+        @test estrutura.nos == nos
+        @test estrutura.elementos == elementos
+
+        # Métodos
+        @test Analise.num_gls_estrut(estrutura) == 12
+
+        @test Analise.gls_livres(estrutura) == [3, 4, 5, 6, 9, 10, 11, 12]
+
+        @test Analise.vetor_forcas(estrutura, true) == [0, 0, 0, 0, 0, 0, 0, 0, 10, -5, 0, 0]
+        @test Analise.vetor_forcas(estrutura, false) == [0, 0, 0, 0, 10, -5, 0, 0]
+
+        @test Analise.vetor_apoios(estrutura) == [1, 2, 7, 8]
+
+        k = sparse([164748.73734152917 24748.73734152916 -70000.0 0.0 -2.624579619658251e-28 4.2862637970157364e-12 -24748.737341529166 -24748.737341529162
+                    24748.737341529155 94748.73734152915 0.0 0.0 4.2862637970157364e-12 -70000.0 -24748.73734152916 -24748.737341529155
+                    -70000.0 0.0 140000.0 -4.2862637970157364e-12 0.0 0.0 -2.624579619658251e-28 4.2862637970157364e-12
+                    0.0 0.0 -4.2862637970157364e-12 70000.0 0.0 0.0 4.2862637970157364e-12 -70000.0
+                    -2.624579619658251e-28 4.2862637970157364e-12 0.0 0.0 94748.73734152917 24748.73734152916 -70000.0 0.0
+                    4.2862637970157364e-12 -70000.0 0.0 0.0 24748.737341529155 94748.73734152915 0.0 0.0
+                    -24748.737341529166 -24748.737341529162 -2.624579619658251e-28 4.2862637970157364e-12 -70000.0 0.0 119497.47468305833 -3.637978807091713e-12
+                    -24748.73734152916 -24748.737341529155 4.2862637970157364e-12 -70000.0 0.0 0.0 -3.637978807091713e-12 119497.4746830583])
+        @test Analise.k_estrutura_1(estrutura) ≈ Analise.k_estrutura_2(estrutura) ≈ k
+
+        @test Analise.deslocamentos(estrutura, 1, true) ≈ Analise.deslocamentos(estrutura, 2, true) ≈ [0.0, 0.0, 4.761904761904763e-5, -0.00019817906943235845, 2.3809523809523814e-5, -7.528001090665546e-5, 0.0, 0.0, 0.0002696076408609297, -0.0002696076408609298, 0.00012675049800378677, -7.528001090665545e-5]
+        @test Analise.deslocamentos(estrutura, 1, false) ≈ Analise.deslocamentos(estrutura, 2, false) ≈ [4.761904761904763e-5, -0.00019817906943235845, 2.3809523809523814e-5, -7.528001090665546e-5, 0.0002696076408609297, -0.0002696076408609298, 0.00012675049800378677, -7.528001090665545e-5]
+
+
+        k = Array(Analise.k_estrutura_1(estrutura))
+        for i in 1:8
+            println(k[i, 1:end])
+        end
+    end
 
 end
