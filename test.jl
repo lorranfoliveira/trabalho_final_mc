@@ -3,6 +3,7 @@ include("analise.jl")
 using Test
 using .Analise
 using SparseArrays
+using LinearAlgebra
 
 # =======================================================================
 @testset verbose = true "Analise" begin
@@ -74,7 +75,7 @@ using SparseArrays
         # Métodos
         @test Analise.comprimento(elementos[2]) ≈ 2.8284271247461903
         
-        @test Analise.gls_elem(elementos[2]) == [1, 2, 9, 10]
+        @test Analise.gls_elemento(elementos[2]) == [1, 2, 9, 10]
 
         @test Analise.vetor_forcas(elementos[2]) == [0, 0, 10, -5]
         @test Analise.vetor_forcas(elementos[9]) == [0, 0, 10, -5]
@@ -84,11 +85,11 @@ using SparseArrays
         @test Analise.angulo(elementos[9]) ≈ 0
         @test Analise.angulo(elementos[8]) ≈ -pi / 4
 
-        @test Analise.mat_rot(elementos[3]) ≈ [1 0 0 0 
+        @test Analise.matriz_rotacao(elementos[3]) ≈ [1 0 0 0 
                                                0 1 0 0
                                                0 0 1 0
                                                0 0 0 1]
-        @test Analise.mat_rot(elementos[4]) ≈ [√2/2 √2/2  0       0
+        @test Analise.matriz_rotacao(elementos[4]) ≈ [√2/2 √2/2  0       0
                                               -√2/2 √2/2  0       0
                                                0       0  √2/2 √2/2
                                                0       0 -√2/2 √2/2]
@@ -98,10 +99,10 @@ using SparseArrays
                                          -49497.474683058324  0  49497.474683058324   0
                                                            0  0                   0   0]
 
-        @test Analise.ke_rot(elementos[4]) ≈ [24748.737341529166 24748.737341529162 -24748.737341529166 -24748.737341529162
-                                              24748.73734152916 24748.737341529155 -24748.73734152916 -24748.737341529155
-                                             -24748.737341529166 -24748.737341529162 24748.737341529166 24748.737341529162 
-                                             -24748.73734152916 -24748.737341529155 24748.73734152916 24748.737341529155]
+        @test Analise.ke_global(elementos[4]) ≈ [24748.737341529166 24748.737341529162 -24748.737341529166 -24748.737341529162
+                                                 24748.73734152916 24748.737341529155 -24748.73734152916 -24748.737341529155
+                                                -24748.737341529166 -24748.737341529162 24748.737341529166 24748.737341529162 
+                                                -24748.73734152916 -24748.737341529155 24748.73734152916 24748.737341529155]
     end
 
     @testset "Estrutura" begin
@@ -109,7 +110,7 @@ using SparseArrays
         @test estrutura.elementos == elementos
 
         # Métodos
-        @test Analise.num_gls_estrut(estrutura) == 12
+        @test Analise.num_gls_estrutura(estrutura) == 12
 
         @test Analise.gls_livres(estrutura) == [3, 4, 5, 6, 9, 10, 11, 12]
 
@@ -131,11 +132,7 @@ using SparseArrays
         @test Analise.deslocamentos(estrutura, 1, true) ≈ Analise.deslocamentos(estrutura, 2, true) ≈ [0.0, 0.0, 4.761904761904763e-5, -0.00019817906943235845, 2.3809523809523814e-5, -7.528001090665546e-5, 0.0, 0.0, 0.0002696076408609297, -0.0002696076408609298, 0.00012675049800378677, -7.528001090665545e-5]
         @test Analise.deslocamentos(estrutura, 1, false) ≈ Analise.deslocamentos(estrutura, 2, false) ≈ [4.761904761904763e-5, -0.00019817906943235845, 2.3809523809523814e-5, -7.528001090665546e-5, 0.0002696076408609297, -0.0002696076408609298, 0.00012675049800378677, -7.528001090665545e-5]
 
-
-        k = Array(Analise.k_estrutura_1(estrutura))
-        for i in 1:8
-            println(k[i, 1:end])
-        end
+        @test Analise.forca_interna(estrutura) ≈ [3.3340206284604434, 0.0012720448909134228, -1.6664023403833994, 7.0710761922049326, -1.6665674915761208, -4.999137587831104, 0.00018544477509152557, -7.07105622101196, -9.999339096309345]
     end
 
 end
