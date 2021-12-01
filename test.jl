@@ -5,9 +5,8 @@ using .Analise
 using SparseArrays
 using LinearAlgebra
 
-# =======================================================================
 @testset verbose = true "Analise" begin
-
+    # =======================================================================
     # Nós
     nos = [No(1, 1, -1; rx=true, ry=true),
            No(2, 3, -1),
@@ -34,6 +33,7 @@ using LinearAlgebra
     # Estrutura
     estrutura = Estrutura(nos, elementos)
 
+    # =======================================================================
     @testset "No" begin
         @test nos[2].id == 2
         @test nos[2].x == 3
@@ -57,6 +57,7 @@ using LinearAlgebra
         @test Analise.vetor_apoios(nos[2]) == [false, false]
     end
 
+    # =======================================================================
     @testset "Material" begin
         @test material.id == 1
         @test material.E == 100e6
@@ -65,6 +66,7 @@ using LinearAlgebra
         @test_throws ArgumentError Material(1, -100e6)
     end
 
+    # =======================================================================
     @testset "Elementos" begin
         @test elementos[2].id == 2
         @test elementos[2].no₁ == nos[1]
@@ -105,6 +107,7 @@ using LinearAlgebra
                                                 -24748.73734152916 -24748.737341529155 24748.73734152916 24748.737341529155]
     end
 
+    # =======================================================================
     @testset "Estrutura" begin
         @test estrutura.nos == nos
         @test estrutura.elementos == elementos
