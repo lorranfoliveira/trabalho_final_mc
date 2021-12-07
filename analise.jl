@@ -44,34 +44,26 @@ Retorna a distância entre dois nós.
 no₁::No -> Nó de referência 1.
 no₂::No -> Nó de referência 2.
 """
-function distancia(no₁::No, no₂::No)::Float64
-    return norm([(no₂.x - no₁.x), (no₂.y - no₁.y)])
-end
+distancia(no₁::No, no₂::No)::Float64 = norm([(no₂.x - no₁.x), (no₂.y - no₁.y)])
 
 """
 Retorna um vetor contendo os graus de liberdade do nó.
 """
-function gls_no(no::No)::Vector{Int64}
-    return [Analise.num_gls_no * no.id - 1, Analise.num_gls_no * no.id]
-end
+gls_no(no::No)::Vector{Int64} = [Analise.num_gls_no * no.id - 1, Analise.num_gls_no * no.id]
 
 """
 Retorna um vetor contendo as forças nodais.
 """
-function vetor_forcas(no::No)::Vector{Float64}
-    return [no.fx, no.fy]
-end
+vetor_forcas(no::No)::Vector{Float64} = [no.fx, no.fy]
 
 """
 Retorna o vetor de apoios nodais.
 """
-function vetor_apoios(no::No)::Vector{Bool}
-    return [no.rx, no.ry]
-end
+vetor_apoios(no::No)::Vector{Bool} = [no.rx, no.ry]
 
 # =======================================================================
 """
-Implementa as propriedades do material.
+Define as propriedades do material que compõe os elementos..
 
 v: Coeficiente de Poisson.
 E: Módulo de Elasticidade.
@@ -93,9 +85,9 @@ end
 
 # =======================================================================
 """
-Implementa as propriedades de uma elemento de pórtico.
+Implementa as propriedades de uma elemento de treliça.
 
-id: Identificação do elemento.
+id: Número de identificação do elemento.
 no₁: Nó inicial.
 no₂: Nó final.
 area: Área da seção transversal.
@@ -112,8 +104,8 @@ struct Elemento
         if id < 1
             throw(ArgumentError("O número de identificação do elemento não pode ser menor que 1!"))
         end
-        if !(area > 0)
-            throw(ArgumentError("A área da seção deve ser maior que 0!"))
+        if area < 0
+            throw(ArgumentError("A área da seção não pode ser menor que 0!"))
         end
         new(id, no₁, no₂, area, material)
     end
@@ -122,39 +114,30 @@ end
 """
 Retorna o comprimento do elemento.
 """
-function comprimento(elemento::Elemento)::Float64
-    return distancia(elemento.no₁, elemento.no₂)
-end
+comprimento(elemento::Elemento)::Float64 = distancia(elemento.no₁, elemento.no₂)
 
 """
 Retorna um vetor contendo os graus de liberdade do elemento.
 """
-function gls_elemento(elemento::Elemento)::Vector{Int64}
-    gl_no₁ = gls_no(elemento.no₁)
-    gl_no₂ = gls_no(elemento.no₂)
-
-    return vcat(gl_no₁, gl_no₂)
-end
+gls_elemento(elemento::Elemento)::Vector{Int64} = vcat(gls_no(elemento.no₁), gls_no(elemento.no₂))
 
 """
 Retorna o vetor de forças atuantes nos graus de liberdade do elemento.
 """
-function vetor_forcas(elemento::Elemento)::Vector{Float64}
-    return vcat(vetor_forcas(elemento.no₁), vetor_forcas(elemento.no₂))
-end
+vetor_forcas(elemento::Elemento)::Vector{Float64} = vcat(vetor_forcas(elemento.no₁), vetor_forcas(elemento.no₂))
 
 """
-Ângulo de inclinação do elemento.
+Retorna o ângulo de inclinação do elemento.
 """
 function angulo(elemento::Elemento)::Float64
     dx = elemento.no₂.x - elemento.no₁.x
     dy = elemento.no₂.y - elemento.no₁.y
 
-    return atan(dy / dx)
+    return atan(dy, dx)
 end
 
 """
-Matriz de rotação do elemento.
+Retorna a matriz de rotação do elemento.
 """
 function matriz_rotacao(elemento::Elemento)::Matrix{Float64}
     θ = angulo(elemento)
@@ -206,16 +189,12 @@ end
 """
 Retorna o número de graus de liberdade da estrutura.
 """
-function num_gls_estrutura(estrutura::Estrutura)::Int64
-    return Analise.num_gls_no * length(estrutura.nos)
-end
+num_gls_estrutura(estrutura::Estrutura)::Int64 = Analise.num_gls_no * length(estrutura.nos)
 
 """
 Retorna os graus de liberdade livres.
 """
-function gls_livres(estrutura::Estrutura)::Vector{Int64}
-    return setdiff(1:num_gls_estrutura(estrutura), vetor_apoios(estrutura))
-end
+gls_livres(estrutura::Estrutura)::Vector{Int64} = setdiff(1:num_gls_estrutura(estrutura), vetor_apoios(estrutura))
 
 """
 Retorna o vetor de forças da estrutura.
@@ -234,7 +213,6 @@ function vetor_forcas(estrutura::Estrutura, incluir_gls_impedidos::Bool=true)::V
     end
 end
 
-
 """
 Retorna um vetor com os graus de liberdade impedidos.
 """
@@ -246,7 +224,7 @@ function vetor_apoios(estrutura::Estrutura)::Vector{Int64}
 
         if any(vaps)
             gls = gls_no(no)
-            append!(apoios, [gls[i] for i in 1:Analise.num_gls_no if vaps[i]])
+            append!(apoios, [gls[i] for (i,j) in enumerate(vaps) if j])
         end
     end
     return apoios
@@ -257,7 +235,7 @@ Retorna a matriz de rigidez esparsa da estrutura.
 Procedimento de montagem feito pela soma das rigidezes de cada elemento
 diretamente na matriz esparsa global da estrutura.
 """
-function k_estrutura_1(estrutura::Estrutura)
+function k_estrutura_1(estrutura::Estrutura)::SparseMatrixCSC
     ngl = num_gls_estrutura(estrutura)
     k = spzeros(ngl, ngl)
 
@@ -277,7 +255,7 @@ Procedimento de montagem com 3 vetores separados.
 """
 function k_estrutura_2(estrutura::Estrutura)::SparseMatrixCSC
     # Número de termos em cada matriz de rigidez de elementos.
-    num_gle = (Analise.num_gls_no * 2)^2
+    num_gle = (Analise.num_gls_no * 2)
     apoios = vetor_apoios(estrutura)
 
     num_it = length(estrutura.elementos) * num_gle^2
@@ -317,7 +295,7 @@ end
 """
 Retorna o vetor dos deslocamentos nodais.
 """
-function deslocamentos(estrutura::Estrutura, metodo=1, incluir_gls_impedidos::Bool=true)::Array{Float64}
+function deslocamentos(estrutura::Estrutura, metodo=1)::Array{Float64}
     if metodo == 1
         kf = k_estrutura_1
     else
@@ -326,36 +304,32 @@ function deslocamentos(estrutura::Estrutura, metodo=1, incluir_gls_impedidos::Bo
 
     u = kf(estrutura) \ vetor_forcas(estrutura, false)
 
-    if incluir_gls_impedidos
-        uf = zeros(num_gls_estrutura(estrutura))
-        uf[gls_livres(estrutura)] = u
-        return uf
-    else
-        return u
-    end
+    uf = zeros(num_gls_estrutura(estrutura))
+    uf[gls_livres(estrutura)] = u
+    return uf
 end
 
 """
 Retorna um vetor contendo os nós em suas novas posições com a estrutura deformada.
 """
-function nos_deform(estrutura::Estrutura)::Vector{No}
+function nos_deslocados(estrutura::Estrutura, escala::Int64=1)::Vector{No}
     num_nos = length(estrutura.nos)
     u_pontos = reshape(deslocamentos(estrutura, 2), (2, num_nos))'
-    nos_def = Array{No}(undef, length(estrutura.nos))
+    nos_desloc = Array{No}(undef, length(estrutura.nos))
 
     for i in 1:num_nos
-        nos_def[i] = No(i, estrutura.nos[i].x + u_pontos[i, 1], 
-                           estrutura.nos[i].y + u_pontos[i, 2])
+        nos_desloc[i] = No(i, estrutura.nos[i].x + escala * u_pontos[i, 1], 
+                           estrutura.nos[i].y + escala * u_pontos[i, 2])
     end
-    return nos_def
+    return nos_desloc
 end
 
 """
 Retorna os valores dos esforços normais atuantes em cada elemento.
 """
-function forca_interna(estrutura::Estrutura)::Vector{Float64}
+function forcas_internas(estrutura::Estrutura)::Vector{Float64}
     forcas = Array{Float64}(undef, length(estrutura.elementos))
-    nos_def = nos_deform(estrutura)
+    nos_def = nos_deslocados(estrutura)
 
     for (i, elem) in enumerate(estrutura.elementos)
         l₀ = comprimento(elem)
