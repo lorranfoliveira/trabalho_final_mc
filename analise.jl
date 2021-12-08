@@ -335,10 +335,9 @@ function forcas_internas(estrutura::Estrutura)::Vector{Float64}
         l₀ = comprimento(elem)
         l₁ = distancia(nos_def[elem.no₁.id], nos_def[elem.no₂.id])
         deform = (l₁ - l₀) / l₀
-
         forcas[i] = elem.area * elem.material.E * deform
     end
-
+    
     return forcas
 end
     
